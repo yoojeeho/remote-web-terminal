@@ -9,35 +9,48 @@ type Props = {
   onStart?: (command: string) => void;
   onStdout?: (command: string, stdout: string) => void;
   onStderr?: (command: string, stderr: string) => void;
-  onExit?: (command: string, exitCode: number) => void;
+  onExit?: (command: string, exitCode: number, workingDirectory: string) => void;
 }
 
 export default function TerminalComponent(props: Props) {
   const wsMgr = new WebSocketManager(props.server);
 
   const [directory, setDirectory] = React.useState("");
-  const [command, setCommand] = React.useState("");
+  const [manualCommand, setManualCommand] = React.useState("");
   const [output, setOutput] = React.useState([] as string[]);
+  const [isAutoScrollMode, setAutoScroll] = React.useState(true);
+
+  const handleCommandOutput = (command: string, newOutput: string, callback?: (command: string, stderr: string) => void) => {
+    setOutput(update(output, { $push: [ newOutput ] }));
+
+    if (isAutoScrollMode) {
+      //Go to output bottom
+    }
+
+    callback && callback(command, newOutput);
+  }
 
   React.useEffect(() => setDirectory(wsMgr.getDefaultDirectory()), []);
-  React.useEffect(() => wsMgr.sendCommand(props.injectedCommand), [props.injectedCommand]);
+  React.useEffect(() => wsMgr.sendCommand(directory, props.injectedCommand), [props.injectedCommand]);
 
   wsMgr.onStart = (command) => {
+    setOutput(update(output, { $push: [ directory + "> " + command ] }));
+
     props.onStart && props.onStart(command);
   };
 
   wsMgr.onStdout = (command, stdout) => {
-    setOutput(update(output, { $push: [ stdout ] }));
-    props.onStdout && props.onStdout(command, stdout);
+    handleCommandOutput(command, stdout, props.onStdout);
   };
 
   wsMgr.onStderr = (command, stderr) => {
-    setOutput(update(output, {$push: [ stderr ]}));
-    props.onStderr && props.onStderr(command, stderr);
+    handleCommandOutput(command, stderr, props.onStdout);
   };
 
-  wsMgr.onExit = (command, code) => {
-    props.onExit && props.onExit(command, code);
+  wsMgr.onExit = (command, code, workingDirectory) => {
+    setDirectory(workingDirectory);
+
+    props.onExit && props.onExit(command, code, workingDirectory);
   };
 
   return (
@@ -51,12 +64,12 @@ export default function TerminalComponent(props: Props) {
       <form onSubmit={(e) => {
         e.preventDefault();
 
-        wsMgr.sendCommand(command);
+        wsMgr.sendCommand(directory, manualCommand);
 
-        setCommand("");
+        setManualCommand("");
       }}>
         <label>{directory} > </label>
-        <input type="text" value={command} onChange={e =>setCommand(e.target.value)} />
+        <input type="text" value={manualCommand} onChange={e =>setManualCommand(e.target.value)} />
         <input type="submit" style={{ "display": "none" }} />
       </form>
     </div>

@@ -1,15 +1,4 @@
-interface MessageFormat {
-    command: string;
-    type: 'start' | 'stdout' | 'stderr' | 'exit';
-}
-
-interface OutputMessageFromat extends MessageFormat {
-    output: string;
-}
-
-interface ExitsMessageFromat extends MessageFormat {
-    code: number;
-}
+import { CommandMessageFormat, OutputMessageFromat, ExitMessageFromat } from "../../../protocol/CommandMessageFormat";
 
 export default class WebSocketManager {
     private webSocket: WebSocket;
@@ -17,7 +6,7 @@ export default class WebSocketManager {
     public onStart?: (command: string) => void;
     public onStdout?: (command: string, stdout: string) => void;
     public onStderr?: (command: string, stderr: string) => void;
-    public onExit?: (command: string, exitCode: number) => void;
+    public onExit?: (command: string, exitCode: number, workingDirectory: string) => void;
   
     constructor(server: string) {
       this.webSocket = new WebSocket(server);
@@ -29,15 +18,16 @@ export default class WebSocketManager {
       return "/home/test";
     }
   
-    public sendCommand(command?: string) {
+    public sendCommand(workingDirectory: string, command?: string) {
       if (!command) return;
     
       alert(command);
+
       this.onStdout && this.onStdout(command, command);
     }
 
     private onMessage(e: MessageEvent) {
-      let message = e.data as MessageFormat;
+      let message = e.data as CommandMessageFormat;
 
       switch (message.type) {
           case 'start':
@@ -56,9 +46,9 @@ export default class WebSocketManager {
             this.onStderr && this.onStderr(stderrMsg.command, stderrMsg.output);
             break;
           case 'exit':
-            let exitMsg = message as ExitsMessageFromat;
+            let exitMsg = message as ExitMessageFromat;
 
-            this.onExit && this.onExit(exitMsg.command, exitMsg.code);
+            this.onExit && this.onExit(exitMsg.command, exitMsg.code, exitMsg.workingDirectory);
             break;
       }
     }
