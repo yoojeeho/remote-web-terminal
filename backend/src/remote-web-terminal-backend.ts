@@ -1,15 +1,18 @@
 import { Server } from 'ws';
 
+import MessageHandler from './message-handler';
+
 export default class RemoteWebTerminalBackend {
-  constructor(defaultWorkingDirectory: string, port: number) {
-    const wsServer = new Server({ port: port });
+  constructor(private defaultWorkingDirectory: string, private port: number) { }
+
+  public listen() {
+    const wsServer = new Server({ port: this.port });
 
     wsServer.on('connection', (ws) => {
-      ws.on('message', this.onMessage);
+      const msgHandler = new MessageHandler(ws);
+
+      ws.on('message', msgHandler.onMessage);
     });
   }
 
-  private onMessage(message: string) {
-
-  }
 }

@@ -6,10 +6,10 @@ import WebSocketManager from '../service/WebSocketManager';
 type Props = {
   server: string;
   injectedCommand?: string;
-  onStart?: (command: string) => void;
-  onStdout?: (command: string, stdout: string) => void;
-  onStderr?: (command: string, stderr: string) => void;
-  onExit?: (command: string, exitCode: number, workingDirectory: string) => void;
+  onCommandStart?: (command: string) => void;
+  onCommandStdout?: (command: string, stdout: string) => void;
+  onCommandStderr?: (command: string, stderr: string) => void;
+  onCommandExit?: (command: string, exitCode: number, workingDirectory: string) => void;
 }
 
 export default function TerminalComponent(props: Props) {
@@ -24,39 +24,43 @@ export default function TerminalComponent(props: Props) {
     setOutput(update(output, { $push: [ newOutput ] }));
 
     if (isAutoScrollMode) {
-      //Go to output bottom
+      setAutoScroll(isAutoScrollMode);
     }
 
     callback && callback(command, newOutput);
   }
 
-  React.useEffect(() => setDirectory(wsMgr.getDefaultDirectory()), []);
+  React.useEffect(() => { /* Block UI */ }, []);
   React.useEffect(() => wsMgr.sendCommand(directory, props.injectedCommand), [props.injectedCommand]);
 
-  wsMgr.onStart = (command) => {
+  wsMgr.onConnectionInit = (workingDirectory) => {
+    /* Unblock UI */
+    setDirectory(workingDirectory);
+  }
+
+  wsMgr.onCommandStart = (command) => {
     setOutput(update(output, { $push: [ directory + "> " + command ] }));
 
-    props.onStart && props.onStart(command);
+    props.onCommandStart && props.onCommandStart(command);
   };
 
-  wsMgr.onStdout = (command, stdout) => {
-    handleCommandOutput(command, stdout, props.onStdout);
+  wsMgr.onCommandStdout = (command, stdout) => {
+    handleCommandOutput(command, stdout, props.onCommandStdout);
   };
 
-  wsMgr.onStderr = (command, stderr) => {
-    handleCommandOutput(command, stderr, props.onStdout);
+  wsMgr.onCommandStderr = (command, stderr) => {
+    handleCommandOutput(command, stderr, props.onCommandStdout);
   };
 
-  wsMgr.onExit = (command, code, workingDirectory) => {
+  wsMgr.onCommandExit = (command, code, workingDirectory) => {
     setDirectory(workingDirectory);
 
-    props.onExit && props.onExit(command, code, workingDirectory);
+    props.onCommandExit && props.onCommandExit(command, code, workingDirectory);
   };
 
   return (
     <div style={{"height": "100%"}}>
       <div style={{"height": "100%"}} /* Scrollable, expanded height */>
-        output here
         {
           output.map((line) => <div>{line}</div>)
         }

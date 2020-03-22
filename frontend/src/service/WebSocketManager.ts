@@ -1,56 +1,57 @@
-import { CommandMessageFormat, OutputMessageFromat, ExitMessageFromat } from "../../../protocol/CommandMessageFormat";
+import { Server2ClientMessageFormat, ConnectionInitMessageFormat, CommandOutputMessageFromat, CommandExitMessageFromat } from "../../../protocol/Server2ClientMessageFormat";
+import { CommandPushMessageFormat } from "../../../protocol/Client2ServerMessageFormat";
 
 export default class WebSocketManager {
-    private webSocket: WebSocket;
+  private webSocket: WebSocket;
 
-    public onStart?: (command: string) => void;
-    public onStdout?: (command: string, stdout: string) => void;
-    public onStderr?: (command: string, stderr: string) => void;
-    public onExit?: (command: string, exitCode: number, workingDirectory: string) => void;
-  
-    constructor(server: string) {
-      this.webSocket = new WebSocket(server);
-  
-      this.webSocket.onmessage = this.onMessage;
-    }
-  
-    public getDefaultDirectory() {
-      return "/home/test";
-    }
-  
-    public sendCommand(workingDirectory: string, command?: string) {
-      if (!command) return;
-    
-      alert(command);
+  public onConnectionInit?: (workingDirectory: string) => void;
+  public onCommandStart?: (command: string) => void;
+  public onCommandStdout?: (command: string, stdout: string) => void;
+  public onCommandStderr?: (command: string, stderr: string) => void;
+  public onCommandExit?: (command: string, exitCode: number, workingDirectory: string) => void;
 
-      this.onStdout && this.onStdout(command, command);
-    }
+  constructor(server: string) {
+    this.webSocket = new WebSocket(server);
 
-    private onMessage(e: MessageEvent) {
-      let message = e.data as CommandMessageFormat;
+    this.webSocket.onmessage = this.onMessage;
+  }
 
-      switch (message.type) {
-          case 'start':
-            let startMsg = message as OutputMessageFromat;
-                  
-            this.onStart && this.onStart(startMsg.command);
-            break;
-          case 'stdout':
-            let stdoutMsg = message as OutputMessageFromat;
-                  
-            this.onStdout && this.onStdout(stdoutMsg.command, stdoutMsg.output);
-            break;
-          case 'stderr':
-            let stderrMsg = message as OutputMessageFromat;
+  public sendCommand(workingDirectory: string, command?: string) {
+    if (!command) return;
 
-            this.onStderr && this.onStderr(stderrMsg.command, stderrMsg.output);
-            break;
-          case 'exit':
-            let exitMsg = message as ExitMessageFromat;
+    alert(workingDirectory + "> " + command);
 
-            this.onExit && this.onExit(exitMsg.command, exitMsg.code, exitMsg.workingDirectory);
-            break;
-      }
+    const msgObj: CommandPushMessageFormat = { type: 'command-push', command: command };
+    const msgStr = JSON.stringify(msgObj);
+
+    this.webSocket.send(msgStr);
+  }
+
+  private onMessage = (e: MessageEvent) => {
+    let message = e.data as Server2ClientMessageFormat;
+
+    switch (message.type) {
+      case 'connection-init':
+        this.onConnectionInit && this.onConnectionInit((message as ConnectionInitMessageFormat).workingDirectory);
+        break;
+      case 'command-start':
+        this.onCommandStart && this.onCommandStart((message as CommandOutputMessageFromat).command);
+        break;
+      case 'command-stdout':
+        let stdoutMsg = message as CommandOutputMessageFromat;
+
+        this.onCommandStdout && this.onCommandStdout(stdoutMsg.command, stdoutMsg.output);
+        break;
+      case 'command-stderr':
+        let stderrMsg = message as CommandOutputMessageFromat;
+
+        this.onCommandStderr && this.onCommandStderr(stderrMsg.command, stderrMsg.output);
+        break;
+      case 'command-exit':
+        let exitMsg = message as CommandExitMessageFromat;
+
+        this.onCommandExit && this.onCommandExit(exitMsg.command, exitMsg.code, exitMsg.workingDirectory);
+        break;
     }
   }
-  
+}
